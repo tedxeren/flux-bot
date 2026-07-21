@@ -230,17 +230,21 @@ async def ses_cal(ctx, *, arama: str):
     YDL_OPTIONS = {
         'format': 'bestaudio',
         'noplaylist': 'True',
-        'default_search': 'ytsearch',
+        'default_search': 'scsearch',
         'source_address': '0.0.0.0',
         'geo_bypass': True,
-        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['mweb', 'android']
+            }
+        }
     }
     FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
 
     import yt_dlp
     with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
         try:
-            info = ydl.extract_info(f"ytsearch:{arama}", download=False)
+            info = ydl.extract_info(f"scsearch:{arama}", download=False)
             if 'entries' in info:
                 info = info['entries'][0]
             url = info['url']
