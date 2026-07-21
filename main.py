@@ -19,6 +19,7 @@ seviye_kanali = None
 otorol_kanali = None
 uyarilar = {}
 user_xp = {}
+user_para = {}  # Ekonomi sistemi için bakiye deposu
 
 # --- FOOTER YARDIMCI ---
 def set_footer(embed, ctx):
@@ -135,6 +136,7 @@ async def yardım(ctx):
     embed.add_field(name="🎭 Rol & Panel", value="`!rololuştur <isim>`, `!panel @rol`", inline=False)
     embed.add_field(name="⚙️ Sunucu Ayarları", value="`!otorolkanal #kanal`, `!otorolayarla @rol`, `!seviyekanali #kanal`", inline=False)
     embed.add_field(name="🎵 Müzik", value="`!gir`, `!çal <şarkı adı>`, `!dur`, `!cik`", inline=False)
+    embed.add_field(name="💰 Ekonomi", value="`!bakiye`, `!günlük`, `!çalış`, `!bahis <miktar>`", inline=False)
     embed.add_field(name="🎮 Eğlence & Seviye", value="`!rank @üye`, `!yazıtura`, `!düello @üye`, `!söz`", inline=False)
     embed.add_field(name="ℹ️ Bilgi", value="`!ping`, `!avatar @üye`, `!kullanıcıbilgi @üye`, `!sunucubilgi`", inline=False)
     set_footer(embed, ctx)
@@ -189,6 +191,77 @@ async def otorolayarla(ctx, rol: discord.Role):
     global otorol_rolu
     otorol_rolu = rol
     embed = discord.Embed(description=f"✅ Otorol {rol.mention} olarak ayarlandı.", color=discord.Color.green())
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+
+# --- EKONOMİ KOMUTLARI ---
+@bot.command(name="bakiye", aliases=["cüzdan", "para"])
+async def bakiye(ctx, member: discord.Member = None):
+    member = member or ctx.author
+    if member.id not in user_para:
+        user_para[member.id] = [100, 0] # Başlangıç: 100 cüzdan, 0 banka
+    
+    cüzdan, banka = user_para[member.id]
+    embed = discord.Embed(title=f"💰 {member.name} - Bakiye Bilgisi", color=discord.Color.gold())
+    embed.add_field(name="Cüzdan", value=f"💵 {cüzdan} Coin", inline=True)
+    embed.add_field(name="Banka", value=f"🏦 {banka} Coin", inline=True)
+    embed.add_field(name="Toplam", value=f"💎 {cüzdan + banka} Coin", inline=False)
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+
+@bot.command(name="günlük", aliases=["daily"])
+async def günlük(ctx):
+    uid = ctx.author.id
+    if uid not in user_para:
+        user_para[uid] = [100, 0]
+    
+    odul = random.randint(250, 500)
+    user_para[uid][0] += odul
+    
+    embed = discord.Embed(description=f"🎁 Günlük ödülünü aldın! Cüzdanına **{odul} Coin** eklendi.", color=discord.Color.green())
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+
+@bot.command(name="çalış", aliases=["work"])
+async def çalış(ctx):
+    uid = ctx.author.id
+    if uid not in user_para:
+        user_para[uid] = [100, 0]
+    
+    meslekler = [
+        ("Discord Botu kodladın ve telif aldın", 150),
+        ("Beşiktaş stadyumunda çim biçtin", 80),
+        ("Yazılım şirketinde bug çözdün", 200),
+        ("Kafe de garsonluk yaptın", 100)
+    ]
+    
+    is_adi, kazanc = random.choice(meslekler)
+    user_para[uid][0] += kazanc
+    
+    embed = discord.Embed(description=f"💼 {is_adi} ve karşılığında **{kazanc} Coin** kazandın!", color=discord.Color.blue())
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+
+@bot.command(name="bahis", aliases=["coinflip", "kumar"])
+async def bahis(ctx, miktar: int):
+    uid = ctx.author.id
+    if uid not in user_para or user_para[uid][0] < miktar:
+        embed = discord.Embed(description="❌ Cüzdanında o kadar yeterli coin yok!", color=discord.Color.red())
+        set_footer(embed, ctx)
+        await ctx.send(embed=embed)
+        return
+    
+    if miktar <= 0:
+        return
+
+    sonuc = random.choice([True, False])
+    if sonuc:
+        user_para[uid][0] += miktar
+        embed = discord.Embed(description=f"🎉 Şanslı günündesin! Bahsi kazandın ve **+{miktar} Coin** kazandın!", color=discord.Color.green())
+    else:
+         user_para[uid][0] -= miktar
+         embed = discord.Embed(description=f"😢 Maalesef kaybettin, **-{miktar} Coin** gitti.", color=discord.Color.red())
+         
     set_footer(embed, ctx)
     await ctx.send(embed=embed)
 
@@ -436,4 +509,4 @@ async def on_ready():
 keep_alive()
 time.sleep(2)
 bot.run(os.environ['DISCORD_TOKEN'])
-    
+        
