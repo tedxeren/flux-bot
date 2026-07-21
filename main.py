@@ -6,22 +6,20 @@ import os
 import time
 from keep_alive import keep_alive
 
-# --- AYARLAR ---
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Veri depoları
 hosgeldin_kanali = None
 otorol_rolu = None
 seviye_kanali = None
 otorol_kanali = None
 uyarilar = {}
 user_xp = {}
-user_para = {}  # Ekonomi sistemi için bakiye deposu
+user_para = {}
+user_pet = {}
 
-# --- FOOTER YARDIMCI ---
 def set_footer(embed, ctx):
     embed.set_footer(
         text=f"Flux Bot • {ctx.author.name} tarafından istendi",
@@ -29,11 +27,10 @@ def set_footer(embed, ctx):
     )
     return embed
 
-# --- DURUM DÖNGÜSÜ ---
 durum_listesi = [
     ("!yardım | Flux Bot", discord.ActivityType.playing),
     ("sunucuları koruyorum ⚡", discord.ActivityType.watching),
-    (f"komutlarını bekliyorum", discord.ActivityType.listening),
+    ("komutlarını bekliyorum", discord.ActivityType.listening),
     ("Flux Bot v1.0", discord.ActivityType.playing),
 ]
 durum_index = 0
@@ -45,7 +42,6 @@ async def durum_degistir():
     await bot.change_presence(activity=discord.Activity(type=tip, name=metin))
     durum_index = (durum_index + 1) % len(durum_listesi)
 
-# --- BUTONLAR ---
 class KapatView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -63,14 +59,12 @@ class DestekView(discord.ui.View):
     @discord.ui.button(label="🎫 Destek Aç", style=discord.ButtonStyle.green, custom_id="destek_button")
     async def destek_buton(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild = interaction.guild
-
         mevcut = discord.utils.get(guild.text_channels, name=f"talep-{interaction.user.name}")
         if mevcut:
             await interaction.response.send_message(f"⚠️ Zaten açık bir talebin var: {mevcut.mention}", ephemeral=True)
             return
 
-        category = guild.get_channel(self.category_id) if self.category_id else \
-                   discord.utils.get(guild.categories, name="Destek Talepleri")
+        category = guild.get_channel(self.category_id) if self.category_id else discord.utils.get(guild.categories, name="Destek Talepleri")
         yetkili_rol = guild.get_role(self.yetkili_rol_id) if self.yetkili_rol_id else None
 
         overwrites = {
@@ -80,11 +74,7 @@ class DestekView(discord.ui.View):
         if yetkili_rol:
             overwrites[yetkili_rol] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
 
-        channel = await guild.create_text_channel(
-            name=f"talep-{interaction.user.name}",
-            category=category,
-            overwrites=overwrites
-        )
+        channel = await guild.create_text_channel(name=f"talep-{interaction.user.name}", category=category, overwrites=overwrites)
         await interaction.response.send_message(f"✅ Destek talebin açıldı: {channel.mention}", ephemeral=True)
         mesaj = f"{interaction.user.mention}"
         if yetkili_rol:
@@ -92,7 +82,6 @@ class DestekView(discord.ui.View):
         mesaj += ", destek başladı."
         await channel.send(mesaj, view=KapatView())
 
-# --- MESAJ XP ---
 @bot.event
 async def on_member_join(member):
     if otorol_rolu:
@@ -126,8 +115,6 @@ async def on_message(message):
         await hedef.send(f"🎉 Tebrikler {message.author.mention}, **{user_xp[uid][1]}. seviyeye** ulaştın!")
     await bot.process_commands(message)
 
-# --- KOMUTLAR ---
-
 @bot.command()
 async def yardım(ctx):
     embed = discord.Embed(title="🤖 Flux Yardım Menüsü", color=discord.Color.blue())
@@ -136,13 +123,12 @@ async def yardım(ctx):
     embed.add_field(name="🎭 Rol & Panel", value="`!rololuştur <isim>`, `!panel @rol`", inline=False)
     embed.add_field(name="⚙️ Sunucu Ayarları", value="`!otorolkanal #kanal`, `!otorolayarla @rol`, `!seviyekanali #kanal`", inline=False)
     embed.add_field(name="🎵 Müzik", value="`!gir`, `!çal <şarkı adı>`, `!dur`, `!cik`", inline=False)
-    embed.add_field(name="💰 Ekonomi", value="`!bakiye`, `!günlük`, `!çalış`, `!bahis <miktar>`", inline=False)
-    embed.add_field(name="🎮 Eğlence & Seviye", value="`!rank @üye`, `!yazıtura`, `!düello @üye`, `!söz`", inline=False)
-    embed.add_field(name="ℹ️ Bilgi", value="`!ping`, `!avatar @üye`, `!kullanıcıbilgi @üye`, `!sunucubilgi`", inline=False)
+    embed.add_field(name="💰 Ekonomi & Banka", value="`!bakiye`, `!günlük`, `!çalış`, `!yatır`, `!çek`, `!gönder`, `!zenginler`", inline=False)
+    embed.add_field(name="🐾 Pet & Şans", value="`!pet`, `!petbesle`, `!rulet`, `!kazıkazan`", inline=False)
+    embed.add_field(name="🎮 Eğlence", value="`!rank`, `!topxp`, `!yazıtura`, `!düello`, `!söz`", inline=False)
     set_footer(embed, ctx)
     await ctx.send(embed=embed)
 
-# Moderasyon
 @bot.command()
 @commands.has_permissions(manage_messages=True)
 async def sil(ctx, miktar: int):
@@ -165,9 +151,7 @@ async def uyar(ctx, member: discord.Member, *, sebep="Belirtilmemiş"):
     embed = discord.Embed(description=f"⚠️ {member.mention} uyarıldı!\n**Sebep:** {sebep}", color=discord.Color.yellow())
     set_footer(embed, ctx)
     await ctx.send(embed=embed)
-
-# Ayarlar
-@bot.command()
+    @bot.command()
 @commands.has_permissions(administrator=True)
 async def seviyekanali(ctx, kanal: discord.TextChannel):
     global seviye_kanali
@@ -194,13 +178,11 @@ async def otorolayarla(ctx, rol: discord.Role):
     set_footer(embed, ctx)
     await ctx.send(embed=embed)
 
-# --- EKONOMİ KOMUTLARI ---
 @bot.command(name="bakiye", aliases=["cüzdan", "para"])
 async def bakiye(ctx, member: discord.Member = None):
     member = member or ctx.author
     if member.id not in user_para:
-        user_para[member.id] = [100, 0] # Başlangıç: 100 cüzdan, 0 banka
-    
+        user_para[member.id] = [100, 0]
     cüzdan, banka = user_para[member.id]
     embed = discord.Embed(title=f"💰 {member.name} - Bakiye Bilgisi", color=discord.Color.gold())
     embed.add_field(name="Cüzdan", value=f"💵 {cüzdan} Coin", inline=True)
@@ -214,10 +196,8 @@ async def günlük(ctx):
     uid = ctx.author.id
     if uid not in user_para:
         user_para[uid] = [100, 0]
-    
     odul = random.randint(250, 500)
     user_para[uid][0] += odul
-    
     embed = discord.Embed(description=f"🎁 Günlük ödülünü aldın! Cüzdanına **{odul} Coin** eklendi.", color=discord.Color.green())
     set_footer(embed, ctx)
     await ctx.send(embed=embed)
@@ -227,278 +207,216 @@ async def çalış(ctx):
     uid = ctx.author.id
     if uid not in user_para:
         user_para[uid] = [100, 0]
-    
     meslekler = [
         ("Discord Botu kodladın ve telif aldın", 150),
         ("Beşiktaş stadyumunda çim biçtin", 80),
         ("Yazılım şirketinde bug çözdün", 200),
-        ("Kafe de garsonluk yaptın", 100)
+        ("Kafede garsonluk yaptın", 100)
     ]
-    
     is_adi, kazanc = random.choice(meslekler)
     user_para[uid][0] += kazanc
-    
     embed = discord.Embed(description=f"💼 {is_adi} ve karşılığında **{kazanc} Coin** kazandın!", color=discord.Color.blue())
     set_footer(embed, ctx)
     await ctx.send(embed=embed)
 
-@bot.command(name="bahis", aliases=["coinflip", "kumar"])
-async def bahis(ctx, miktar: int):
+@bot.command(name="yatır")
+async def yatir(ctx, miktar: str):
     uid = ctx.author.id
-    if uid not in user_para or user_para[uid][0] < miktar:
-        embed = discord.Embed(description="❌ Cüzdanında o kadar yeterli coin yok!", color=discord.Color.red())
-        set_footer(embed, ctx)
-        await ctx.send(embed=embed)
+    if uid not in user_para:
+        user_para[uid] = [100, 0]
+    cüzdan = user_para[uid][0]
+    tutar = cüzdan if miktar.lower() == "hepsi" else int(miktar)
+    if tutar <= 0 or tutar > cüzdan:
+        await ctx.send("❌ Geçersiz miktar veya yetersiz cüzdan!")
         return
-    
-    if miktar <= 0:
-        return
-
-    sonuc = random.choice([True, False])
-    if sonuc:
-        user_para[uid][0] += miktar
-        embed = discord.Embed(description=f"🎉 Şanslı günündesin! Bahsi kazandın ve **+{miktar} Coin** kazandın!", color=discord.Color.green())
-    else:
-         user_para[uid][0] -= miktar
-         embed = discord.Embed(description=f"😢 Maalesef kaybettin, **-{miktar} Coin** gitti.", color=discord.Color.red())
-         
+    user_para[uid][0] -= tutar
+    user_para[uid][1] += tutar
+    embed = discord.Embed(description=f"🏦 Başarıyla **{tutar} Coin** bankaya yatırıldı.", color=discord.Color.green())
     set_footer(embed, ctx)
     await ctx.send(embed=embed)
 
-# --- MÜZİK KOMUTLARI ---
+@bot.command(name="çek")
+async def cek(ctx, miktar: str):
+    uid = ctx.author.id
+    if uid not in user_para:
+        user_para[uid] = [100, 0]
+    banka = user_para[uid][1]
+    tutar = banka if miktar.lower() == "hepsi" else int(miktar)
+    if tutar <= 0 or tutar > banka:
+        await ctx.send("❌ Geçersiz miktar veya yetersiz banka!")
+        return
+    user_para[uid][1] -= tutar
+    user_para[uid][0] += tutar
+    embed = discord.Embed(description=f"💵 Başarıyla **{tutar} Coin** çekildi.", color=discord.Color.green())
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+
+@bot.command(name="gönder", aliases=["transfer"])
+async def gonder(ctx, member: discord.Member, miktar: int):
+    uid = ctx.author.id
+    if uid not in user_para or user_para[uid][0] < miktar or miktar <= 0:
+        await ctx.send("❌ Yetersiz bakiye veya geçersiz miktar!")
+        return
+    if member.id not in user_para:
+        user_para[member.id] = [100, 0]
+    user_para[uid][0] -= miktar
+    user_para[member.id][0] += miktar
+    embed = discord.Embed(description=f"💸 {member.mention} kullanıcısına **{miktar} Coin** gönderildi.", color=discord.Color.green())
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+
+@bot.command(name="zenginler", aliases=["top", "leaderboard"])
+async def zenginler(ctx):
+    if not user_para:
+        await ctx.send("❌ Kayıt yok!")
+        return
+    sirali_liste = sorted(user_para.items(), key=lambda x: x[1][0] + x[1][1], reverse=True)[:10]
+    embed = discord.Embed(title="🏆 Zenginler Listesi", color=discord.Color.gold())
+    aciklama = ""
+    for sira, (uid, para) in enumerate(sirali_liste, 1):
+        member = ctx.guild.get_member(uid)
+        isim = member.name if member else f"Kullanıcı"
+        toplam = para[0] + para[1]
+        aciklama += f"`#{sira}` **{isim}** — 💎 {toplam} Coin\n"
+    embed.description = aciklama
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+
+@bot.command(name="pet")
+async def pet(ctx):
+    uid = ctx.author.id
+    if uid not in user_pet:
+        user_pet[uid] = ["Minik Kartal", 1, 50]
+    p_isim, p_sev, p_aclik = user_pet[uid]
+    embed = discord.Embed(title=f"🐾 {ctx.author.name} - Pet", color=discord.Color.purple())
+    embed.add_field(name="İsim", value=p_isim)
+    embed.add_field(name="Seviye", value=str(p_sev))
+    embed.add_field(name="Açlık", value=f"%{p_aclik}")
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+
+@bot.command(name="petbesle")
+async def petbesle(ctx):
+    uid = ctx.author.id
+    if uid not in user_pet:
+        user_pet[uid] = ["Minik Kartal", 1, 50]
+    if uid not in user_para or user_para[uid][0] < 50:
+        await ctx.send("❌ 50 Coin lazım!")
+        return
+    user_para[uid][0] -= 50
+    user_pet[uid][1] += 1
+    user_pet[uid][2] = min(100, user_pet[uid][2] + 25)
+    embed = discord.Embed(description="🍖 Pet beslendi ve seviye atladı!", color=discord.Color.green())
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+
+@bot.command(name="rulet")
+async def rulet(ctx, miktar: int, renk: str):
+    uid = ctx.author.id
+    if uid not in user_para or user_para[uid][0] < miktar or miktar <= 0:
+        await ctx.send("❌ Yetersiz bakiye!")
+        return
+    renk = renk.lower()
+    kazanan = random.choice(["kırmızı", "siyah", "yeşil"])
+    carpan = 14 if kazanan == "yeşil" else 2
+    if renk == kazanan:
+        user_para[uid][0] += miktar * carpan
+        embed = discord.Embed(description=f"🎡 Kazandın! +{miktar * carpan} Coin", color=discord.Color.green())
+    else:
+        user_para[uid][0] -= miktar
+        embed = discord.Embed(description=f"🎡 Kaybettin! -{miktar} Coin", color=discord.Color.red())
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+
+@bot.command(name="kazıkazan", aliases=["kazikazan"])
+async def kazikazan(ctx):
+    uid = ctx.author.id
+    if uid not in user_para or user_para[uid][0] < 30:
+        await ctx.send("❌ 30 Coin lazım!")
+        return
+    user_para[uid][0] -= 30
+    semboller = ["💎", "💰", "🍒", "⭐"]
+    cekilis = [random.choice(semboller) for _ in range(3)]
+    if cekilis[0] == cekilis[1] == cekilis[2]:
+        user_para[uid][0] += 300
+        embed = discord.Embed(description=f"🎉 {' '.join(cekilis)} - Üçlü! +300 Coin", color=discord.Color.gold())
+    else:
+        user_para[uid][0] += 40
+        embed = discord.Embed(description=f"✨ {' '.join(cekilis)} - Teselli! +40 Coin", color=discord.Color.green())
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+
 @bot.command(name="gir")
 async def ses_gir(ctx):
     if ctx.author.voice:
         channel = ctx.author.voice.channel
-        if ctx.voice_client is not None:
+        if ctx.voice_client:
             await ctx.voice_client.move_to(channel)
         else:
             await channel.connect()
-        embed = discord.Embed(description=f"🎤 **{channel.name}** kanalına katıldım!", color=discord.Color.green())
-        set_footer(embed, ctx)
-        await ctx.send(embed=embed)
-    else:
-        embed = discord.Embed(description="❌ Önce bir ses kanalına girmelisin!", color=discord.Color.red())
-        set_footer(embed, ctx)
-        await ctx.send(embed=embed)
+        await ctx.send("🎤 Ses kanalına katıldım!")
 
 @bot.command(name="çal")
 async def ses_cal(ctx, *, arama: str):
     if not ctx.author.voice:
-        embed = discord.Embed(description="❌ Önce bir ses kanalına girmelisin!", color=discord.Color.red())
-        set_footer(embed, ctx)
-        await ctx.send(embed=embed)
+        await ctx.send("❌ Önce ses kanalına gir!")
         return
-
     channel = ctx.author.voice.channel
-    if ctx.voice_client is None:
+    if not ctx.voice_client:
         await channel.connect()
-    elif ctx.voice_client.channel != channel:
-        await ctx.voice_client.move_to(channel)
-
-    embed = discord.Embed(description=f"🎶 **{arama}** aranıyor ve çalınıyor...", color=discord.Color.blue())
-    set_footer(embed, ctx)
-    await ctx.send(embed=embed)
-
-    YDL_OPTIONS = {
-        'format': 'bestaudio',
-        'noplaylist': 'True',
-        'default_search': 'scsearch',
-        'source_address': '0.0.0.0',
-        'geo_bypass': True,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['mweb', 'android']
-            }
-        }
-    }
-    FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
-
+    YDL_OPTIONS = {'format': 'bestaudio', 'default_search': 'scsearch', 'noplaylist': True}
+    FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1', 'options': '-vn'}
     import yt_dlp
     with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
         try:
-            info = ydl.extract_info(f"scsearch:{arama}", download=False)
-            if 'entries' in info:
-                info = info['entries'][0]
+            info = ydl.extract_info(arama, download=False)
+            if 'entries' in info: info = info['entries'][0]
             url = info['url']
-            title = info.get('title', 'Bilinmeyen Şarkı')
-            
-            if ctx.voice_client.is_playing():
-                ctx.voice_client.stop()
-
+            if ctx.voice_client.is_playing(): ctx.voice_client.stop()
             ctx.voice_client.play(discord.FFmpegPCMAudio(url, **FFMPEG_OPTIONS))
-            
-            success_embed = discord.Embed(description=f"▶️ Şimdi Çalınıyor: **{title}**", color=discord.Color.green())
-            set_footer(success_embed, ctx)
-            await ctx.send(embed=success_embed)
+            await ctx.send(f"▶️ Çalınıyor: {info.get('title')}")
         except Exception as e:
-            err_embed = discord.Embed(description=f"❌ Şarkı oynatılırken bir hata oluştu: {e}", color=discord.Color.red())
-            set_footer(err_embed, ctx)
-            await ctx.send(embed=err_embed)
+            await ctx.send(f"❌ Hata: {e}")
 
 @bot.command(name="dur")
 async def ses_dur(ctx):
     if ctx.voice_client and ctx.voice_client.is_playing():
         ctx.voice_client.pause()
-        embed = discord.Embed(description="⏸️ Müzik duraklatıldı.", color=discord.Color.yellow())
-        set_footer(embed, ctx)
-        await ctx.send(embed=embed)
-    else:
-        embed = discord.Embed(description="❌ Şu an çalan bir müzik yok.", color=discord.Color.red())
-        set_footer(embed, ctx)
-        await ctx.send(embed=embed)
+        await ctx.send("⏸️ Duraklatıldı.")
 
 @bot.command(name="cik")
 async def ses_cik(ctx):
     if ctx.voice_client:
         await ctx.voice_client.disconnect()
-        embed = discord.Embed(description="👋 Ses kanalından ayrıldım.", color=discord.Color.red())
-        set_footer(embed, ctx)
-        await ctx.send(embed=embed)
-    else:
-        embed = discord.Embed(description="❌ Zaten bir ses kanalında değilim!", color=discord.Color.red())
-        set_footer(embed, ctx)
-        await ctx.send(embed=embed)
+        await ctx.send("👋 Ayrıldım.")
 
-# Bilgi
 @bot.command()
 async def ping(ctx):
-    embed = discord.Embed(description=f"🏓 Pong! **{round(bot.latency * 1000)}ms**", color=discord.Color.blue())
-    set_footer(embed, ctx)
-    await ctx.send(embed=embed)
+    await ctx.send(f"🏓 Pong! {round(bot.latency * 1000)}ms")
 
-@bot.command()
-async def sunucubilgi(ctx):
-    embed = discord.Embed(title=f"🏠 {ctx.guild.name}", color=discord.Color.blue())
-    embed.add_field(name="Üye Sayısı", value=ctx.guild.member_count)
-    embed.add_field(name="Kuruluş", value=ctx.guild.created_at.strftime('%d.%m.%Y'))
-    if ctx.guild.icon:
-        embed.set_thumbnail(url=ctx.guild.icon.url)
-    set_footer(embed, ctx)
-    await ctx.send(embed=embed)
-
-@bot.command()
-async def kullanıcıbilgi(ctx, member: discord.Member = None):
-    member = member or ctx.author
-    embed = discord.Embed(title=f"👤 {member.name}", color=discord.Color.blue())
-    embed.add_field(name="Katılım Tarihi", value=member.joined_at.strftime('%d.%m.%Y'))
-    embed.add_field(name="Hesap Oluşturma", value=member.created_at.strftime('%d.%m.%Y'))
-    embed.set_thumbnail(url=member.display_avatar.url)
-    set_footer(embed, ctx)
-    await ctx.send(embed=embed)
-
-# Eğlence
 @bot.command()
 async def rank(ctx, member: discord.Member = None):
     member = member or ctx.author
     data = user_xp.get(member.id, [0, 1])
-    embed = discord.Embed(title=f"📊 {member.name} Seviye Bilgisi", color=discord.Color.purple())
-    embed.add_field(name="Seviye", value=data[1])
-    embed.add_field(name="XP", value=f"{data[0]} / {data[1] * 100}")
-    embed.set_thumbnail(url=member.display_avatar.url)
-    set_footer(embed, ctx)
-    await ctx.send(embed=embed)
+    await ctx.send(f"📊 Seviye: {data[1]} | XP: {data[0]}/{data[1]*100}")
+
+@bot.command(name="topxp")
+async def topxp(ctx):
+    if not user_xp:
+        await ctx.send("❌ Kayıt yok!")
+        return
+    sirali = sorted(user_xp.items(), key=lambda x: (x[1][1], x[1][0]), reverse=True)[:10]
+    aciklama = "".join([f"`#{i}` <@{uid}> — Seviye: {d[1]}\n" for i, (uid, d) in enumerate(sirali, 1)])
+    await ctx.send(embed=discord.Embed(title="🏆 Seviye Sıralaması", description=aciklama, color=discord.Color.purple()))
 
 @bot.command()
 async def yazıtura(ctx):
-    sonuc = random.choice(['Yazı', 'Tura'])
-    embed = discord.Embed(description=f"🪙 Sonuç: **{sonuc}**", color=discord.Color.gold())
-    set_footer(embed, ctx)
-    await ctx.send(embed=embed)
-
-@bot.command()
-async def düello(ctx, üye: discord.Member):
-    kazanan = random.choice([ctx.author, üye])
-    embed = discord.Embed(description=f"⚔️ **{ctx.author.name}** vs **{üye.name}**\n\n🏆 Kazanan: **{kazanan.name}**!", color=discord.Color.red())
-    set_footer(embed, ctx)
-    await ctx.send(embed=embed)
+    await ctx.send(f"🪙 Sonuç: {random.choice(['Yazı', 'Tura'])}")
 
 @bot.command()
 async def söz(ctx):
-    sozler = [
-        "Başarı, pes etmeyenlerindir.",
-        "Flux seninle!",
-        "Yeni bir gün, yeni bir seviye.",
-        "Güçlü ol, Flux yanında.",
-        "Her engel, daha büyük bir başarının habercisidir."
-    ]
-    embed = discord.Embed(description=f"✨ *{random.choice(sozler)}*", color=discord.Color.blurple())
-    set_footer(embed, ctx)
-    await ctx.send(embed=embed)
+    await ctx.send(f"✨ *{random.choice(['Başarı pes etmeyenlerindir.', 'Flux seninle!', 'Güçlü ol!'])}*")
 
-# --- DİĞER KOMUTLAR ---
-
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def duyur(ctx, kanal: discord.TextChannel, *, mesaj: str):
-    embed = discord.Embed(
-        title="📢 Duyuru",
-        description=mesaj,
-        color=discord.Color.orange()
-    )
-    embed.set_author(name=ctx.author.name, icon_url=ctx.author.display_avatar.url)
-    set_footer(embed, ctx)
-    await kanal.send(embed=embed)
-    onay = discord.Embed(description=f"✅ Duyuru {kanal.mention} kanalına gönderildi.", color=discord.Color.green())
-    set_footer(onay, ctx)
-    await ctx.send(embed=onay, delete_after=5)
-
-@bot.command()
-async def avatar(ctx, member: discord.Member = None):
-    member = member or ctx.author
-    embed = discord.Embed(title=f"🖼️ {member.name} Avatarı", color=discord.Color.blurple())
-    embed.set_image(url=member.display_avatar.url)
-    set_footer(embed, ctx)
-    await ctx.send(embed=embed)
-
-@bot.command()
-@commands.has_permissions(manage_channels=True)
-async def kanaloluştur(ctx, *, isim: str):
-    kanal = await ctx.guild.create_text_channel(name=isim)
-    embed = discord.Embed(description=f"✅ {kanal.mention} kanalı oluşturuldu.", color=discord.Color.green())
-    set_footer(embed, ctx)
-    await ctx.send(embed=embed)
-
-@bot.command()
-@commands.has_permissions(manage_channels=True)
-async def kanalkilitle(ctx, kanal: discord.TextChannel = None):
-    kanal = kanal or ctx.channel
-    await kanal.set_permissions(ctx.guild.default_role, send_messages=False)
-    embed = discord.Embed(description=f"🔒 {kanal.mention} kanalı kilitlendi.", color=discord.Color.red())
-    set_footer(embed, ctx)
-    await ctx.send(embed=embed)
-
-@bot.command()
-@commands.has_permissions(manage_channels=True)
-async def kilitsiz(ctx, kanal: discord.TextChannel = None):
-    kanal = kanal or ctx.channel
-    await kanal.set_permissions(ctx.guild.default_role, send_messages=True)
-    embed = discord.Embed(description=f"🔓 {kanal.mention} kanalının kilidi açıldı.", color=discord.Color.green())
-    set_footer(embed, ctx)
-    await ctx.send(embed=embed)
-
-@bot.command()
-@commands.has_permissions(manage_roles=True)
-async def rololuştur(ctx, *, isim: str):
-    rol = await ctx.guild.create_role(name=isim)
-    embed = discord.Embed(description=f"✅ **{rol.name}** rolü oluşturuldu.", color=discord.Color.green())
-    set_footer(embed, ctx)
-    await ctx.send(embed=embed)
-
-# Panel
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def panel(ctx, rol: discord.Role):
-    category = discord.utils.get(ctx.guild.categories, name="Destek Talepleri")
-    if not category:
-        category = await ctx.guild.create_category("Destek Talepleri")
-
-    view = DestekView(category_id=category.id, yetkili_rol_id=rol.id)
-    embed = discord.Embed(title="🎫 Destek Merkezi", description="Aşağıdaki butona tıklayarak destek talebi açabilirsin.", color=discord.Color.blue())
-    set_footer(embed, ctx)
-    await ctx.send(embed=embed, view=view)
-
-# --- BAŞLANGIÇ ---
 @bot.event
 async def on_ready():
     bot.add_view(DestekView())
@@ -509,4 +427,4 @@ async def on_ready():
 keep_alive()
 time.sleep(2)
 bot.run(os.environ['DISCORD_TOKEN'])
-        
+                       
