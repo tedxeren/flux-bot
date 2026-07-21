@@ -151,7 +151,8 @@ async def uyar(ctx, member: discord.Member, *, sebep="Belirtilmemiş"):
     embed = discord.Embed(description=f"⚠️ {member.mention} uyarıldı!\n**Sebep:** {sebep}", color=discord.Color.yellow())
     set_footer(embed, ctx)
     await ctx.send(embed=embed)
-    @bot.command()
+
+@bot.command()
 @commands.has_permissions(administrator=True)
 async def seviyekanali(ctx, kanal: discord.TextChannel):
     global seviye_kanali
