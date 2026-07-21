@@ -460,6 +460,7 @@ async def söz(ctx):
     await ctx.send(f"✨ *{random.choice(['Başarı pes etmeyenlerindir.', 'Flux seninle!', 'Güçlü ol!'])}*")
 
 @bot.command(name="balıktut", aliases=["balık", "fish", "baliktut"])
+@commands.cooldown(1, 20, commands.BucketType.user)
 async def baliktut(ctx):
     uid = ctx.author.id
     
@@ -471,16 +472,22 @@ async def baliktut(ctx):
     if uid not in user_para:
         user_para[uid] = [100, 0]
         
-    # Rastgele balık ve kazanç türleri
+    # (Balık Adı, Kazanç, Çıkma Ağırlığı/Şansı)
     baliklar = [
-        ("Küçük İstavrit", 30),
-        ("Somon Balığı", 75),
-        ("Dev Levrek", 150),
-        ("Nadir Altın Balık", 300),
-        ("Hiçbir şey (Çöp tuttun!)", 0)
+        ("Çöp / Eski Bot", 0, 30),
+        ("Küçük İstavrit", 25, 25),
+        ("Sazangiller", 50, 20),
+        ("Somon Balığı", 100, 12),
+        ("Dev Levrek", 200, 7),
+        ("Kılıç Balığı", 400, 3),
+        ("Nadir Altın Balık", 750, 2),
+        ("Efsanevi Mavi Balina", 1500, 1)
     ]
     
-    balik_adi, kazanc = random.choice(baliklar)
+    # random.choices ile ağırlıklı (şanslı) seçim yapma
+    secilen = random.choices(baliklar, weights=[b[2] for b in baliklar], k=1)[0]
+    balik_adi, kazanc, _ = secilen
+    
     user_para[uid][0] += kazanc
     
     if kazanc > 0:
@@ -490,6 +497,15 @@ async def baliktut(ctx):
         
     set_footer(embed, ctx)
     await ctx.send(embed=embed)
+
+@baliktut.error
+async def baliktut_error(ctx, error):
+    if isinstance(error, commands.CommandOnCooldown):
+        kalan = round(error.retry_after, 1)
+        embed = discord.Embed(description=f"⏳ Oltanı yeniden atmak için **{kalan} saniye** beklemelisin!", color=discord.Color.red())
+        set_footer(embed, ctx)
+        await ctx.send(embed=embed, delete_after=5)
+
 
 @bot.command(name="satınal", aliases=["satyal", "buy"])
 async def satınal(ctx, esya_adi: str):
