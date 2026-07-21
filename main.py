@@ -226,7 +226,7 @@ async def günlük(ctx):
 async def günlük_error(ctx, error):
     if isinstance(error, commands.CommandOnCooldown):
         # Kalan süreyi saat ve dakikaya çevir
-        toplam_ saniye = int(error.retry_after)
+        toplam_saniye = int(error.retry_after)
         saat = toplam_saniye // 3600
         dakika = (toplam_saniye % 3600) // 60
         
