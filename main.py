@@ -23,6 +23,15 @@ user_xp = {}
 user_para = {}
 user_pet = {}
 gunluk_cooldowns = {}
+user_envanter = {} # Kullanıcıların envanterlerini tutar (Örn: {user_id: {"Mama": 2, "VIP Kart": 1}})
+
+# Mağazada satılacak eşyalar (İsim: [Fiyat, Açıklama])
+magaza_esyalari = {
+    "mama": [50, "Petinin açlığını giderir ve seviye atlatır."],
+    "olta": [250, "Balık tutarak ekstra coin kazanmanı sağlar."],
+    "vip": [1000, "Sunucuda havalı bir rozet kazandırır."]
+}
+
 
 
 def set_footer(embed, ctx):
@@ -129,10 +138,12 @@ async def yardım(ctx):
     embed.add_field(name="⚙️ Sunucu Ayarları", value="`!otorolkanal #kanal`, `!otorolayarla @rol`, `!seviyekanali #kanal`", inline=False)
     embed.add_field(name="🎵 Müzik", value="`!gir`, `!çal <şarkı adı>`, `!dur`, `!cik`", inline=False)
     embed.add_field(name="💰 Ekonomi & Banka", value="`!bakiye`, `!günlük`, `!çalış`, `!yatır`, `!çek`, `!gönder`, `!zenginler`", inline=False)
-    embed.add_field(name="🐾 Pet & Şans", value="`!pet`, `!petbesle`, `!rulet`, `!kazıkazan`", inline=False)
-    embed.add_field(name="🎮 Eğlence", value="`!rank`, `!topxp`, `!yazıtura`, `!düello`, `!söz`", inline=False)
+    embed.add_field(name="🛒 Mağaza & Envanter", value="`!magaza`, `!satınal <eşya>`, `!envanter`, `!balıktut`", inline=False)
+    embed.add_field(name="🐾 Pet Sistemi", value="`!pet`, `!petismi <isim>`, `!petbesle`", inline=False)
+    embed.add_field(name="🎮 Eğlence & Şans", value="`!rank`, `!topxp`, `!rulet <miktar> <renk>`, `!kazıkazan`, `!yazıtura`, `!söz`", inline=False)
     set_footer(embed, ctx)
     await ctx.send(embed=embed)
+
 
 @bot.command()
 @commands.has_permissions(manage_messages=True)
@@ -326,15 +337,23 @@ async def petbesle(ctx):
     uid = ctx.author.id
     if uid not in user_pet:
         user_pet[uid] = ["Minik Kartal", 1, 50]
-    if uid not in user_para or user_para[uid][0] < 50:
-        await ctx.send("❌ 50 Coin lazım!")
+        
+    # Envanterinde mama var mı kontrol et
+    if uid not in user_envanter or user_envanter[uid].get("mama", 0) <= 0:
+        await ctx.send("❌ Petini beslemek için envanterinde **Mama** yok! `!magaza` üzerinden mama satın almalısın.")
         return
-    user_para[uid][0] -= 50
+        
+    # Mamayı 1 adet düş
+    user_envanter[uid]["mama"] -= 1
+    
+    # Peti güçlendir
     user_pet[uid][1] += 1
     user_pet[uid][2] = min(100, user_pet[uid][2] + 25)
-    embed = discord.Embed(description="🍖 Pet beslendi ve seviye atladı!", color=discord.Color.green())
+    
+    embed = discord.Embed(description=f"🍖 Mamayı yedirdin, petin seviye atladı ve çok mutlu! (Kalan Mama: {user_envanter[uid]['mama']})", color=discord.Color.green())
     set_footer(embed, ctx)
     await ctx.send(embed=embed)
+
 
 @bot.command(name="rulet")
 async def rulet(ctx, miktar: int, renk: str):
@@ -442,6 +461,112 @@ async def yazıtura(ctx):
 @bot.command()
 async def söz(ctx):
     await ctx.send(f"✨ *{random.choice(['Başarı pes etmeyenlerindir.', 'Flux seninle!', 'Güçlü ol!'])}*")
+
+@bot.command(name="balıktut", aliases=["balık", "fish", "baliktut"])
+async def baliktut(ctx):
+    uid = ctx.author.id
+    
+    # Envanterde olta var mı kontrol et
+    if uid not in user_envanter or user_envanter[uid].get("olta", 0) <= 0:
+        await ctx.send("❌ Balık tutabilmek için önce mağazadan **Olta** satın almalısın! (`!magaza`)")
+        return
+        
+    if uid not in user_para:
+        user_para[uid] = [100, 0]
+        
+    # Rastgele balık ve kazanç türleri
+    baliklar = [
+        ("Küçük İstavrit", 30),
+        ("Somon Balığı", 75),
+        ("Dev Levrek", 150),
+        ("Nadir Altın Balık", 300),
+        ("Hiçbir şey (Çöp tuttun!)", 0)
+    ]
+    
+    balik_adi, kazanc = random.choice(baliklar)
+    user_para[uid][0] += kazanc
+    
+    if kazanc > 0:
+        embed = discord.Embed(description=f"🎣 Denize oltanı attın ve bir **{balik_adi}** yakaladın! Satarak **{kazanc} Coin** kazandın.", color=discord.Color.blue())
+    else:
+        embed = discord.Embed(description=f"🎣 Oltanı attın ama denizden sadece **{balik_adi}** çıktığı için para kazanamadın.", color=discord.Color.red())
+        
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+
+@bot.command(name="satınal", aliases=["satyal", "buy"])
+async def satınal(ctx, esya_adi: str):
+    uid = ctx.author.id
+    esya_adi = esya_adi.lower()
+    
+    if esya_adi not in magaza_esyalari:
+        await ctx.send("❌ Mağazada böyle bir eşya yok! `!magaza` yazarak listeye bakabilirsin.")
+        return
+        
+    fiyat = magaza_esyalari[esya_adi][0]
+    
+    if uid not in user_para or user_para[uid][0] < fiyat:
+        await ctx.send(f"❌ Yeterli cüzdan bakiyen yok! Bu eşya **{fiyat} Coin**.")
+        return
+        
+    # Parayı düş
+    user_para[uid][0] -= fiyat
+    
+    # Envantere ekle
+    if uid not in user_envanter:
+        user_envanter[uid] = {}
+    if esya_adi not in user_envanter[uid]:
+        user_envanter[uid][esya_adi] = 0
+        
+    user_envanter[uid][esya_adi] += 1
+    
+    embed = discord.Embed(description=f"✅ Başarıyla **{esya_adi.capitalize()}** satın aldın! Envanterine eklendi.", color=discord.Color.green())
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+    
+
+@bot.command(name="envanter", aliases=["env", "inventory"])
+async def envanter(ctx, member: discord.Member = None):
+    member = member or ctx.author
+    uid = member.id
+    
+    embed = discord.Embed(title=f"🎒 {member.name} - Envanter", color=discord.Color.purple())
+    
+    if uid not in user_envanter or not user_envanter[uid]:
+        embed.description = "Envanterin bomboş! Mağazadan bir şeyler alabilirsin (`!magaza`)."
+    else:
+        aciklama = ""
+        for esya, adet in user_envanter[uid].items():
+            if adet > 0:
+                aciklama += f"• **{esya.capitalize()}**: {adet} adet\n"
+        embed.description = aciklama if aciklama else "Envanterin bomboş!"
+        
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+
+@bot.command(name="mağaza", aliases=["magaza", "shop"])
+async def magaza(ctx):
+    embed = discord.Embed(title="🛒 Flux Mağaza", description="Satın almak için `!satınal <eşya_adı>` yazabilirsin.", color=discord.Color.blue())
+    for esya, bilgi in magaza_esyalari.items():
+        embed.add_field(name=f"{esya.capitalize()} — 💵 {bilgi[0]} Coin", value=bilgi[1], inline=False)
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+
+@bot.command(name="petismi", aliases=["pet-isim"])
+async def petismi(ctx, *, yeni_isim: str):
+    uid = ctx.author.id
+    if uid not in user_pet:
+        user_pet[uid] = ["Minik Kartal", 1, 50]
+    
+    # İsmi güncelle (Sadece ilk eleman isim)
+    user_pet[uid][0] = yeni_isim
+    
+    embed = discord.Embed(description=f"🐾 Petinin ismi başarıyla **{yeni_isim}** olarak değiştirildi!", color=discord.Color.green())
+    set_footer(embed, ctx)
+    await ctx.send(embed=embed)
+    
+    
+    
 
 @bot.event
 async def on_ready():
