@@ -209,34 +209,31 @@ async def bakiye(ctx, member: discord.Member = None):
     await ctx.send(embed=embed)
     
 @bot.command(name="günlük", aliases=["daily"])
+@commands.cooldown(1, 86400, commands.BucketType.user)
 async def günlük(ctx):
     uid = ctx.author.id
-    simdi = datetime.now()
-    
-    # Süre kontrolü
-    if uid in gunluk_cooldowns:
-        son_alis = gunluk_cooldowns[uid]
-        gecen_sure = simdi - son_alis
-        if gecen_sure < timedelta(days=1):
-            kalan_zaman = timedelta(days=1) - gecen_sure
-            saat = int(kalan_zaman.total_seconds() // 3600)
-            dakika = int((kalan_zaman.total_seconds() % 3600) // 60)
-            
-            embed = discord.Embed(description=f"⏳ Günlük ödülünü zaten almışsın!\nTekrar alabilmek için **{saat} saat {dakika} dakika** beklemelisin.", color=discord.Color.red())
-            set_footer(embed, ctx)
-            await ctx.send(embed=embed)
-            return
-
     if uid not in user_para:
         user_para[uid] = [100, 0]
         
     odul = random.randint(250, 500)
     user_para[uid][0] += odul
-    gunluk_cooldowns[uid] = simdi # Alınma zamanını kaydet
     
     embed = discord.Embed(description=f"🎁 Günlük ödülünü aldın! Cüzdanına **{odul} Coin** eklendi.", color=discord.Color.green())
     set_footer(embed, ctx)
     await ctx.send(embed=embed)
+
+@günlük.error
+async def günlük_error(ctx, error):
+    if isinstance(error, commands.CommandOnCooldown):
+        # Kalan süreyi saat ve dakikaya çevir
+        toplam_ saniye = int(error.retry_after)
+        saat = toplam_saniye // 3600
+        dakika = (toplam_saniye % 3600) // 60
+        
+        embed = discord.Embed(description=f"⏳ Günlük ödülünü zaten almışsın!\nTekrar alabilmek için **{saat} saat {dakika} dakika** beklemelisin.", color=discord.Color.red())
+        set_footer(embed, ctx)
+        await ctx.send(embed=embed, delete_after=10)
+
 
 
 @bot.command(name="çalış", aliases=["work"])
